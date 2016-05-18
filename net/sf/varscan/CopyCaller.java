@@ -10,17 +10,14 @@ package net.sf.varscan;
 
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
-import java.util.Arrays;
-import java.util.BitSet;
 import java.util.HashMap;
 
 /**
  * A class for calling/GC-adjusting copy number variants from raw somatic copynumber output
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *

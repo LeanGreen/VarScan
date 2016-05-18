@@ -19,7 +19,7 @@ package net.sf.varscan;
  * which might not be very accurate if the marginal is very uneven or if there is a small value (less than five)
  * in one of the cells.
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *

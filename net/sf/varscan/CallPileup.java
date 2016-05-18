@@ -14,7 +14,7 @@ import java.util.HashMap;
 /**
  * A class for calling variants or consensus bases from a pileup file
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *

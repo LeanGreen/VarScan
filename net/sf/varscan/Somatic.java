@@ -18,7 +18,7 @@ import java.lang.Math.*;
 /**
  * A class for determining somatic status of variants from Normal/Tumor pileup files
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -111,6 +111,7 @@ public class Somatic {
 		double somaticPvalue = 0.05; //1.0e-04;
 		double minFreqForHom = 0.75;
 		boolean doStrandFilter = true;
+		boolean doValidation = false;
 
 		// Try adjusting any provided parameters based on user inut //
 		try
@@ -181,6 +182,21 @@ public class Somatic {
 					doStrandFilter = false;
 			}
 
+			if(params.containsKey("validation"))
+			{
+				try{
+					int validation = Integer.parseInt(params.get("validation"));
+					if(validation > 0)
+						doValidation = true;
+					else
+						doValidation = false;
+				}
+				catch(Exception e)
+				{
+					doValidation = true;
+				}
+			}
+
 //			System.err.println("Min coverage:\t" + minCoverage);
 			System.err.println("Min coverage:\t" + minCoverageNormal + "x for Normal, " + minCoverageTumor + "x for Tumor");
 			System.err.println("Min reads2:\t" + minReads2);
@@ -192,7 +208,7 @@ public class Somatic {
 			System.err.println("Min avg qual:\t" + minAvgQual);
 			System.err.println("P-value thresh:\t" + pValueThreshold);
 			System.err.println("Somatic p-value:\t" + somaticPvalue);
-			if(params.containsKey("validation"))
+			if(doValidation)
 				System.err.println("Validation mode: on");
 
 		}
@@ -312,7 +328,7 @@ public class Somatic {
 					outIndel.println(vcfHeader);
 				}
 
-		 		if(params.containsKey("validation"))
+		 		if(doValidation)
 		 		{
 			 		outValidation = new PrintStream( new FileOutputStream(outputName + ".validation") );
 			 		if(!params.containsKey("no-headers") && !params.containsKey("output-vcf"))
@@ -609,12 +625,12 @@ public class Somatic {
 
 			    				// Print to master file for validation //
 
-			    				if(params.containsKey("validation"))
+			    				if(doValidation)
 			    				{
 			    					outValidation.println(chromNormal + "\t" + posNormal + "\t" + compareResult);
 			    				}
 
-			    				if(!params.containsKey("validation") && (compareResult.contains("Reference") || compareResult.contains("SS=0")  || compareResult.contains("Filter")))
+			    				if(!doValidation && (compareResult.contains("Reference") || compareResult.contains("SS=0")  || compareResult.contains("Filter")))
 			    				{
 			    					// Don't print reference/indelfilter positions unless doing validation //
 			    				}
@@ -795,6 +811,8 @@ public class Somatic {
 		double pValueThreshold = 0.99;
 		double somaticPvalue = 0.05; //1.0e-04;
 		double minFreqForHom = 0.75;
+		boolean doStrandFilter = true;
+		boolean doValidation = false;
 
 		// Parse command-line parameters //
 		HashMap<String, String> params = VarScan.getParams(args);
@@ -856,7 +874,31 @@ public class Somatic {
 			{
 				 tumorPurity = Double.parseDouble(params.get("tumor-purity"));
 				 if(tumorPurity > 1)
-					 tumorPurity = normalPurity / 100.00;
+					 tumorPurity = tumorPurity / 100.00;
+			}
+
+			if(params.containsKey("strand-filter"))
+			{
+				int filter = Integer.parseInt(params.get("strand-filter"));
+				if(filter > 0)
+					doStrandFilter = true;
+				else
+					doStrandFilter = false;
+			}
+
+			if(params.containsKey("validation"))
+			{
+				try{
+					int validation = Integer.parseInt(params.get("validation"));
+					if(validation > 0)
+						doValidation = true;
+					else
+						doValidation = false;
+				}
+				catch(Exception e)
+				{
+					doValidation = true;
+				}
 			}
 
 //			System.err.println("Min coverage:\t" + minCoverage);
@@ -870,7 +912,7 @@ public class Somatic {
 			System.err.println("Min avg qual:\t" + minAvgQual);
 			System.err.println("P-value thresh:\t" + pValueThreshold);
 			System.err.println("Somatic p-value:\t" + somaticPvalue);
-			if(params.containsKey("validation"))
+			if(doValidation)
 				System.err.println("Validation mode: on");
 
 		}
@@ -942,7 +984,7 @@ public class Somatic {
 				outIndel.println(vcfHeader);
 			}
 
-	 		if(params.containsKey("validation"))
+	 		if(doValidation)
 	 		{
 		 		outValidation = new PrintStream( new FileOutputStream(outputName + ".validation") );
 		 		if(!params.containsKey("no-headers") && !params.containsKey("output-vcf"))
@@ -954,8 +996,9 @@ public class Somatic {
 	 		}
 
 
-	 		BufferedReader normal = new BufferedReader(new FileReader(normalPileupFile));
-		    BufferedReader tumor = new BufferedReader(new FileReader(tumorPileupFile));
+	 		BufferedReader normal = new BufferedReader(new SmartFileReader(normalPileupFile));
+		    BufferedReader tumor = new BufferedReader(new SmartFileReader(tumorPileupFile));
+
 
 	    	// If input file not ready, give it a few seconds //
 	    	int numNaps = 0;
@@ -1183,7 +1226,7 @@ public class Somatic {
 
 
 		    					// Decide on filter field //
-		    					if(params.containsKey("strand-filter") && strandednessDiff > 0.10 && (strandedness2 < 0.10 || strandedness2 > 0.90))
+		    					if(doStrandFilter && strandednessDiff > 0.10 && (strandedness2 < 0.10 || strandedness2 > 0.90))
 		    					{
 		    						compareResult += "\t" + "str10";
 		    					}
@@ -1336,12 +1379,12 @@ public class Somatic {
 		    				}
 		    				// Print to master file for validation //
 
-		    				if(params.containsKey("validation"))
+		    				if(doValidation)
 		    				{
 		    					outValidation.println(chromNormal + "\t" + posNormal + "\t" + compareResult);
 		    				}
 
-		    				if(!params.containsKey("validation") && (compareResult.contains("Reference") || compareResult.contains("SS=0") || compareResult.contains("Filter")))
+		    				if(!doValidation && (compareResult.contains("Reference") || compareResult.contains("SS=0") || compareResult.contains("Filter")))
 		    				{
 		    					// Don't print reference/indelfilter positions unless doing validation //
 		    				}
@@ -1431,7 +1474,7 @@ public class Somatic {
 		    				System.err.println("Resetting normal file because " + chromNormal + " > " + chromTumor);
 				    		normalWasReset = true;
 			    			normal.close();
-				    		normal = new BufferedReader(new FileReader(normalPileupFile));
+				    		normal = new BufferedReader(new SmartFileReader(normalPileupFile));
 		    			}
 
 		    		}
@@ -1660,7 +1703,6 @@ public class Somatic {
 							int normalCoverage = normalReads1 + normalReads2;
 							String normalAllele2 = VarScan.getVarAllele(refBase, normalConsensusContents[0]);
 
-
 							// Get the Normal Read counts for the tumor variant allele //
 
 							if(!tumorAllele2.equals(refBase)) // normalAllele2.equals(refBase) &&
@@ -1672,6 +1714,12 @@ public class Somatic {
 									normalReads2 = Integer.parseInt(alleleContents[0]);
 									normalCoverage = normalReads1 + normalReads2;
 								}
+								else	// Suggested completion logic from Chris Smowton caused logic issues with somatic calling
+								{
+//									normalReads2 = 0;
+	//								normalCoverage = normalReads1;
+								}
+
 							}
 							else if(!normalAllele2.equals(refBase))
 							{

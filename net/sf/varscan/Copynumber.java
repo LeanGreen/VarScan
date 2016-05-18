@@ -2,7 +2,7 @@ package net.sf.varscan;
 
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
-import java.io.FileReader;
+import net.sf.varscan.SmartFileReader;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
@@ -11,7 +11,7 @@ import java.util.HashMap;
 /**
  * A class for calling copy number variants between a tumor and a matched normal sample
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -555,8 +555,8 @@ public class Copynumber {
 
 	 		// Prepare file readers for normal and tumor pileups //
 
-	 		BufferedReader normal = new BufferedReader(new FileReader(normalPileupFile));
-		    BufferedReader tumor = new BufferedReader(new FileReader(tumorPileupFile));
+	 		BufferedReader normal = new BufferedReader(new SmartFileReader(normalPileupFile));
+		    BufferedReader tumor = new BufferedReader(new SmartFileReader(tumorPileupFile));
 
 		    if(!(normal.ready() && tumor.ready()))
 		    {
@@ -686,18 +686,25 @@ public class Copynumber {
 					    		int pileupDepthNormal = 0;
 					    		String normalQualities = "";
 
-			    				// Pileup Files have 6-7 columns //
-		    					if(normalContents.length <= 7)
-		    					{
-		    						pileupDepthNormal = Integer.parseInt(normalContents[3]);
-		    						normalQualities = normalContents[5];
-		    					}
-		    					// Pileup lines in CNS files have 10-11 columns
-		    					else if (normalContents.length >= 10 && normalContents.length <= 11)
-		    					{
-		    						pileupDepthNormal = Integer.parseInt(normalContents[7]);
-		    						normalQualities = normalContents[9];
-		    					}
+					    		try
+					    		{
+				    				// Pileup Files have 6-7 columns //
+			    					if(normalContents.length <= 7)
+			    					{
+			    						pileupDepthNormal = Integer.parseInt(normalContents[3]);
+			    						normalQualities = normalContents[5];
+			    					}
+			    					// Pileup lines in CNS files have 10-11 columns
+			    					else if (normalContents.length >= 10 && normalContents.length <= 11)
+			    					{
+			    						pileupDepthNormal = Integer.parseInt(normalContents[7]);
+			    						normalQualities = normalContents[9];
+			    					}
+					    		}
+					    		catch(Exception e)
+					    		{
+
+					    		}
 
 					    	}
 					    	else
@@ -946,7 +953,7 @@ public class Copynumber {
 		    				System.err.println("Resetting normal file because " + chromNormal + " > " + chromTumor);
 				    		normalWasReset = true;
 			    			normal.close();
-				    		normal = new BufferedReader(new FileReader(normalPileupFile));
+				    		normal = new BufferedReader(new SmartFileReader(normalPileupFile));
 		    			}
 
 		    		}

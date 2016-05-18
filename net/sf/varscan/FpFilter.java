@@ -11,7 +11,7 @@ package net.sf.varscan;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
+import net.sf.varscan.SmartFileReader;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
 import java.util.HashMap;
@@ -19,7 +19,7 @@ import java.util.HashMap;
 /**
  * A class for applying the false-positive filter to VarScan variant calls
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -28,6 +28,35 @@ public class FpFilter {
 
 	public FpFilter(String[] args)
 	{
+		// Set parameter defaults //
+
+		double minRefReadPos = 0.10;
+		double minRefDist3 = 0.10;
+		double minVarReadPos = 0.10;
+		double minVarDist3 = 0.10;
+		double minStrandedness = 0.01;
+		int minStrandReads = 5;
+
+		int minRefAvgRL = 90;
+		int minVarAvgRL = 90;
+		double maxReadLenDiff = 0.25;
+
+		double minVarFreq = 0.05;
+		int minVarCount = 	4;
+		int minVarCountLC = 	2;	// Min variant count for low-coverage sites
+		double maxSomaticP = 0.05;
+		int maxSomaticPdepth = 10;
+
+		int maxVarMMQS = 100;
+		int maxRefMMQS = 100;
+		int maxMMQSdiff = 50;
+
+		int minRefBaseQual = 15;
+		int minVarBaseQual = 15;
+		int minRefMapQual = 15;
+		int minVarMapQual = 15;
+		int maxMapQualDiff = 50;
+
 		//		 Define the usage message //
 		String usage = "USAGE: java -jar VarScan.jar fpfilter [variant file] [readcount file] OPTIONS\n" +
 		"\tvariant file - A file of SNPs or indels in VarScan-native or VCF format\n" +
@@ -37,42 +66,32 @@ public class FpFilter {
 		"\tOPTIONS:\n" +
 		"\t--output-file\t\tOptional output file for filter-pass variants\n" +
 		"\t--filtered-file\t\tOptional output file for filter-fail variants\n" +
-		"\t--keep-failures\t\tIf set to 1, include failures in the output file\n\n" +
-		"\t--min-var-count\t\tMinimum number of variant-supporting reads [4]\n" +
-		"\t--min-var-freq\t\tMinimum variant allele frequency [0.05]\n" +
-		"\t--min-var-readpos\t\tMinimum average read position of var-supporting reads [0.10]\n" +
-		"\t--min-var-dist3\t\tMinimum average relative distance to effective 3' end [0.10]\n" +
-		"\t--min-strandedness\tMinimum fraction of variant reads from each strand [0.01]\n" +
-		"\t--min-strand-reads\tMinimum allele depth required to perform the strand tests [5]\n" +
-		"\t--min-ref-basequal\t\tMinimum average base quality for ref allele [30]\n" +
-		"\t--min-var-basequal\t\tMinimum average base quality for var allele [30]\n" +
-		"\t--max-rl-diff\t\tMaximum average relative read length difference (ref - var) [0.25]\n" +
-		"\t--max-var-mmqs\t\tMaximum mismatch quality sum of variant-supporting reads [100]\n" +
-		"\t--max-mmqs-diff\t\tMaximum average mismatch quality sum (var - ref) [50]\n" +
-		"\t--min-ref-mapqual\t\tMinimum average mapping quality for ref allele [30]\n" +
-		"\t--min-var-mapqual\t\tMinimum average mapping quality for var allele [30]\n" +
-		"\t--max-mapqual-diff\tMaximum average mapping quality (ref - var) [50]";
-
-
-		// Set parameter defaults //
-
-		double minVarReadPos = 0.10;
-		double minVarDist3 = 0.10;
-		double minStrandedness = 0.01;
-		int minStrandReads = 5;
-		double maxReadLenDiff = 0.25;
-
-		double minVarFreq = 0.05;
-		int minVarCount = 	4;
-
-		int maxVarMMQS = 150;
-		int maxMMQSdiff = 150;
-
-		int minRefBaseQual = 30;
-		int minVarBaseQual = 30;
-		int minRefMapQual = 30;
-		int minVarMapQual = 30;
-		int maxMapQualDiff = 50;
+		"\t--dream3-settings\tIf set to 1, optimizes filter parameters based on TCGA-ICGC DREAM-3 SNV Challenge results\n" +
+		"\t--keep-failures\t\tIf set to 1, includes failures in the output file\n\n" +
+		"\n" +
+		"\tFILTERING PARAMETERS:\n" +
+		"\t--min-var-count\t\tMinimum number of variant-supporting reads [" + minVarCount + "]\n" +
+		"\t--min-var-count-lc\tMinimum number of variant-supporting reads when depth below somaticPdepth [" + minVarCountLC + "]\n" +
+		"\t--min-var-freq\t\tMinimum variant allele frequency [" + minVarFreq + "]\n" +
+		"\t--max-somatic-p\t\tMaximum somatic p-value [" + maxSomaticP + "]\n" +
+		"\t--max-somatic-p-depth\tDepth required to test max somatic p-value [" + maxSomaticPdepth + "]\n" +
+		"\t--min-ref-readpos\tMinimum average read position of ref-supporting reads [" + minRefReadPos + "]\n" +
+		"\t--min-var-readpos\tMinimum average read position of var-supporting reads [" + minVarReadPos + "]\n" +
+		"\t--min-ref-dist3\t\tMinimum average distance to effective 3' end (ref) [" + minRefDist3 + "]\n" +
+		"\t--min-var-dist3\t\tMinimum average distance to effective 3' end (var) [" + minVarDist3 + "]\n" +
+		"\t--min-strandedness\tMinimum fraction of variant reads from each strand [" + minStrandedness + "]\n" +
+		"\t--min-strand-reads\tMinimum allele depth required to perform the strand tests [" + minStrandReads + "]\n" +
+		"\t--min-ref-basequal\tMinimum average base quality for ref allele [" + minRefBaseQual + "]\n" +
+		"\t--min-var-basequal\tMinimum average base quality for var allele [" + minVarBaseQual + "]\n" +
+		"\t--min-ref-avgrl\t\tMinimum average trimmed read length for ref allele [" + minRefAvgRL + "]\n" +
+		"\t--min-var-avgrl\t\tMinimum average trimmed read length for var allele [" + minVarAvgRL + "]\n" +
+		"\t--max-rl-diff\t\tMaximum average relative read length difference (ref - var) [" + maxReadLenDiff + "]\n" +
+		"\t--max-ref-mmqs\t\tMaximum mismatch quality sum of reference-supporting reads [" + maxRefMMQS + "]\n" +
+		"\t--max-var-mmqs\t\tMaximum mismatch quality sum of variant-supporting reads [" + maxVarMMQS + "]\n" +
+		"\t--max-mmqs-diff\t\tMaximum average mismatch quality sum (var - ref) [" + maxMMQSdiff + "]\n" +
+		"\t--min-ref-mapqual\tMinimum average mapping quality for ref allele [" + minRefMapQual + "]\n" +
+		"\t--min-var-mapqual\tMinimum average mapping quality for var allele [" + minVarMapQual + "]\n" +
+		"\t--max-mapqual-diff\tMaximum average mapping quality (ref - var) [" + maxMapQualDiff + "]";
 
 
 		String outFileName = "";
@@ -90,17 +109,51 @@ public class FpFilter {
 			if(params.containsKey("filtered-file"))
 				filteredFileName = params.get("filtered-file");
 
+			if(params.containsKey("dream3-settings"))
+			{
+				// Alter the parameter for optimal DREAM-3 performance //
+				minVarCount = 3;
+				minVarCountLC = 1;
+				minStrandedness = 0;
+				minVarBaseQual = 30;
+				minRefReadPos = 0.20;
+				minRefDist3 = 0.20;
+				minVarReadPos = 0.15;
+				minVarDist3 = 0.15;
+				maxReadLenDiff = 0.05;
+				maxMapQualDiff = 10;
+				minRefMapQual = 20;
+				minVarMapQual = 30;
+				maxVarMMQS = 100;
+				maxRefMMQS = 50;
+			}
+
+			if(params.containsKey("min-var-count"))
+				 minVarCount = Integer.parseInt(params.get("min-var-count"));
+
+			if(params.containsKey("min-var-count-lc"))
+				 minVarCountLC = Integer.parseInt(params.get("min-var-count-lc"));
+
 			if(params.containsKey("min-var-freq"))
 				 minVarFreq = Double.parseDouble(params.get("min-var-freq"));
+
+			if(params.containsKey("max-somatic-p"))
+				 maxSomaticP = Double.parseDouble(params.get("max-somatic-p"));
+
+			if(params.containsKey("max-somatic-p-depth"))
+				 maxSomaticPdepth = Integer.parseInt(params.get("max-somatic-p-depth"));
+
+			if(params.containsKey("min-ref-readpos"))
+				 minRefReadPos = Double.parseDouble(params.get("min-ref-readpos"));
 
 			if(params.containsKey("min-var-readpos"))
 				 minVarReadPos = Double.parseDouble(params.get("min-var-readpos"));
 
+			if(params.containsKey("min-ref-dist3"))
+				 minRefDist3 = Double.parseDouble(params.get("min-ref-dist3"));
+
 			if(params.containsKey("min-var-dist3"))
 				 minVarDist3 = Double.parseDouble(params.get("min-var-dist3"));
-
-			if(params.containsKey("max-rl-diff"))
-				 maxReadLenDiff = Double.parseDouble(params.get("max-rl-diff"));
 
 			if(params.containsKey("min-strandedness"))
 				 minStrandedness = Double.parseDouble(params.get("min-strandedness"));
@@ -108,14 +161,20 @@ public class FpFilter {
 			if(params.containsKey("min-strand-reads"))
 				 minStrandReads = Integer.parseInt(params.get("min-strand-reads"));
 
-			if(params.containsKey("min-var-count"))
-				 minVarCount = Integer.parseInt(params.get("min-var-count"));
-
 			if(params.containsKey("min-ref-mapqual"))
 				 minRefMapQual = Integer.parseInt(params.get("min-ref-mapqual"));
 
 			if(params.containsKey("min-var-mapqual"))
 				 minVarMapQual = Integer.parseInt(params.get("min-var-mapqual"));
+
+			if(params.containsKey("min-ref-avgrl"))
+				 minRefAvgRL = Integer.parseInt(params.get("min-ref-avgrl"));
+
+			if(params.containsKey("min-var-avgrl"))
+				 minVarAvgRL = Integer.parseInt(params.get("min-var-avgrl"));
+
+			if(params.containsKey("max-rl-diff"))
+				 maxReadLenDiff = Double.parseDouble(params.get("max-rl-diff"));
 
 			if(params.containsKey("min-ref-basequal"))
 				 minRefBaseQual = Integer.parseInt(params.get("min-ref-basequal"));
@@ -125,6 +184,9 @@ public class FpFilter {
 
 			if(params.containsKey("max-var-mmqs"))
 				 maxVarMMQS = Integer.parseInt(params.get("max-var-mmqs"));
+
+			if(params.containsKey("max-ref-mmqs"))
+				 maxRefMMQS = Integer.parseInt(params.get("max-ref-mmqs"));
 
 			if(params.containsKey("max-mmqs-diff"))
 				 maxMMQSdiff = Integer.parseInt(params.get("max-mmqs-diff"));
@@ -168,9 +230,12 @@ public class FpFilter {
 	    stats.put("numFailVarCount", 0);
 	    stats.put("numFailVarFreq", 0);
 	    stats.put("numFailStrand", 0);
+	    stats.put("numFailRefReadPos", 0);
+	    stats.put("numFailRefDist3", 0);
 	    stats.put("numFailVarReadPos", 0);
 	    stats.put("numFailVarDist3", 0);
 	    stats.put("numFailVarMMQS", 0);
+	    stats.put("numFailRefMMQS", 0);
 	    stats.put("numFailMMQSdiff", 0);
 	    stats.put("numFailRefMapQual", 0);
 	    stats.put("numFailVarMapQual", 0);
@@ -178,6 +243,8 @@ public class FpFilter {
 	    stats.put("numFailVarBaseQual", 0);
 	    stats.put("numFailMapQualDiff", 0);
 	    stats.put("numFailReadLenDiff", 0);
+	    stats.put("numFailRefAvgRL", 0);
+	    stats.put("numFailVarAvgRL", 0);
 
 
 	    try
@@ -210,7 +277,7 @@ public class FpFilter {
 
     		if(variantFile.exists())
     		{
-    			BufferedReader in = new BufferedReader(new FileReader(variantFile));
+    			BufferedReader in = new BufferedReader(new SmartFileReader(variantFile));
 
     			if(in.ready())
     			{
@@ -278,7 +345,7 @@ public class FpFilter {
     		    				}
     		    				else
     		    				{
-    		    					String filterHeader = "ref_reads\tvar_reads\tref_strand\tvar_strand\tref_basequal\tvar_basequal\tref_readpos\tvar_readpos\tref_dist3\tvar_dist3\tref_mapqual\tvar_mapqual\tmapqual_diff\tref_mmqs\tvar_mmqs\tmmqs_diff\tfilter_status";
+    		    					String filterHeader = "ref_reads\tvar_reads\tref_strand\tvar_strand\tref_basequal\tvar_basequal\tref_readpos\tvar_readpos\tref_dist3\tvar_dist3\tref_mapqual\tvar_mapqual\tmapqual_diff\tref_mmqs\tvar_mmqs\tmmqs_diff\t\tref_avg_rl\tvar_avg_rl\tavg_rl_diff\tfilter_status";
 	    	    					if(params.containsKey("output-file"))
 	    	    						outFile.println(line + "\t" + filterHeader);
 	    	    					if(params.containsKey("filtered-file"))
@@ -363,6 +430,13 @@ public class FpFilter {
         	    					{
         	    						ref = lineContents[2];
         	    						String cns = lineContents[3];
+        	    						if(ref.matches("-?\\d+(\\.\\d+)?"))
+        	    						{
+        	    							// Adjust file lists chr_start and chr_stop instead of position //
+        	    							ref = lineContents[3];
+        	    							cns = lineContents[4];
+        	    						}
+
         	    						if(cns.length() > 1)
         	    						{
         	    							isIndel = true;
@@ -476,16 +550,81 @@ public class FpFilter {
                 	    							refMMQS = Double.parseDouble(refContents[9]);
                 	    							refRL = Double.parseDouble(refContents[12]);
                 	    							refDist3 = Double.parseDouble(refContents[13]);
+
+                	    							// ONLY APPLY THESE FILTERS IF WE HAVE 2+ REF-SUPPORTING READS //
+
+                	    							if(refReads >= 2)
+                	    							{
+                    	    							// Variant read position for ref-supporting reads //
+
+                    	    							if(refPos < minRefReadPos)
+                    	    							{
+                    	    								if(failReason.length() > 0)
+                    	    									failReason += ",";
+                    	    								failReason += "RefReadPos";
+                    	    								stats.put("numFailRefReadPos", (stats.get("numFailRefReadPos") + 1));
+                    	    							}
+
+                    	    							if(refDist3 < minRefDist3)
+                    	    							{
+                    	    								if(failReason.length() > 0)
+                    	    									failReason += ",";
+                    	    								failReason += "RefDist3";
+                    	    								stats.put("numFailRefDist3", (stats.get("numFailRefDist3") + 1));
+                    	    							}
+
+                    	    							// Look at ref average mapping quality //
+
+                    	    							if(refReads > 0 && refMapQual < minRefMapQual)
+                    	    							{
+                    	    								if(failReason.length() > 0)
+                    	    									failReason += ",";
+                    	    								failReason += "RefMapQual";
+                    	    								stats.put("numFailRefMapQual", (stats.get("numFailRefMapQual") + 1));
+
+                    	    							}
+
+                    	    							// Look at ref MMQS //
+
+                    	    							if(refMMQS > maxRefMMQS)
+                    	    							{
+                    	    								if(failReason.length() > 0)
+                    	    									failReason += ",";
+                    	    								failReason += "RefMMQS";
+                    	    								stats.put("numFailRefMMQS", (stats.get("numFailRefMMQS") + 1));
+                    	    							}
+
+                    	    							// Look at ref average read length //
+
+                    	    							if(!isIndel && refReads > 0 && refRL < minRefAvgRL)
+                    	    							{
+                    	    								if(failReason.length() > 0)
+                    	    									failReason += ",";
+                    	    								failReason += "RefAvgRL";
+                    	    								stats.put("numFailRefAvgRL", (stats.get("numFailRefAvgRL") + 1));
+                    	    							}
+                	    							}
+
+
             	    							}
 
-            	    							// If variant fails any criteria we have at this point, fail it //
+            	    							// APPLY VARIANT-READ-BASED FILTERS //
+            	    							int totalDepth = refReads + varReads;
 
             	    							if(varReads < minVarCount)
             	    							{
-            	    								if(failReason.length() > 0)
-            	    									failReason += ",";
-            	    								failReason += "VarCount";
-            	    								stats.put("numFailVarCount", (stats.get("numFailVarCount") + 1));
+            	    								// Pass this site if variant-supporting read count meets min for low-cov //
+            	    								if(totalDepth < maxSomaticPdepth && varReads >= minVarCountLC)
+            	    								{
+            	    									// PASS//
+            	    								}
+            	    								else
+            	    								{
+                	    								if(failReason.length() > 0)
+                	    									failReason += ",";
+                	    								failReason += "VarCount";
+                	    								stats.put("numFailVarCount", (stats.get("numFailVarCount") + 1));
+            	    								}
             	    							}
 
             	    							// Compute variant allele frequency //
@@ -530,14 +669,6 @@ public class FpFilter {
 
             	    							// Apply minimum average mapqual checks //
 
-            	    							if(refReads > 0 && refMapQual < minRefMapQual)
-            	    							{
-            	    								if(failReason.length() > 0)
-            	    									failReason += ",";
-            	    								failReason += "RefMapQual";
-            	    								stats.put("numFailRefMapQual", (stats.get("numFailRefMapQual") + 1));
-
-            	    							}
 
             	    							if(varReads > 0 && varMapQual < minVarMapQual)
             	    							{
@@ -566,6 +697,14 @@ public class FpFilter {
             	    								stats.put("numFailVarBaseQual", (stats.get("numFailVarBaseQual") + 1));
             	    							}
 
+            	    							if(!isIndel && varReads > 0 && varRL < minVarAvgRL)
+            	    							{
+            	    								if(failReason.length() > 0)
+            	    									failReason += ",";
+            	    								failReason += "VarAvgRL";
+            	    								stats.put("numFailVarAvgRL", (stats.get("numFailVarAvgRL") + 1));
+            	    							}
+
             	    							// IF we have enough reads supporting the variant, check strand //
 
             	    							if(refReads >= minStrandReads && refReads > 0)
@@ -587,6 +726,8 @@ public class FpFilter {
         	    									}
 
             	    							}
+
+            	    							// REF AND VAR COMPARISONS: REQUIRE 2+ READS FOR EACH ALLELE //
 
             	    							if(refReads >= 2 && varReads >= 2)
             	    							{
@@ -674,6 +815,7 @@ public class FpFilter {
     			    			filterColumns += "\t" + refBaseQual + "\t" + varBaseQual + "\t" + refPos + "\t" + varPos;
     			    			filterColumns += "\t" + refDist3 + "\t" + varDist3 + "\t" + refMapQual + "\t" + varMapQual;
     			    			filterColumns += "\t" + twoDigits.format(mapQualDiff) + "\t" + refMMQS + "\t" + varMMQS + "\t" + twoDigits.format(mmqsDiff);
+    			    			filterColumns += "\t" + refRL + "\t" + varRL + "\t" + twoDigits.format(avgReadLenDiff);
 
     			    			if(filterFlag)
     							{
@@ -746,8 +888,11 @@ public class FpFilter {
     	    		System.err.println("\t" + stats.get("numFailVarCount") + " failed minimim variant count < " + minVarCount);
     	    		System.err.println("\t" + stats.get("numFailVarFreq") + " failed minimum variant freq < " + minVarFreq);
     	    		System.err.println("\t" + stats.get("numFailStrand") + " failed minimum strandedness < " + minStrandedness);
+    	    		System.err.println("\t" + stats.get("numFailRefReadPos") + " failed minimum reference readpos < " + minRefReadPos);
     	    		System.err.println("\t" + stats.get("numFailVarReadPos") + " failed minimum variant readpos < " + minVarReadPos);
+    	    		System.err.println("\t" + stats.get("numFailRefDist3") + " failed minimum reference dist3 < " + minRefDist3);
     	    		System.err.println("\t" + stats.get("numFailVarDist3") + " failed minimum variant dist3 < " + minVarDist3);
+    	    		System.err.println("\t" + stats.get("numFailRefMMQS") + " failed maximum reference MMQS > " + maxRefMMQS);
     	    		System.err.println("\t" + stats.get("numFailVarMMQS") + " failed maximum variant MMQS > " + maxVarMMQS);
     	    		System.err.println("\t" + stats.get("numFailMMQSdiff") + " failed maximum MMQS diff (var - ref) > " + maxMMQSdiff);
     	    		System.err.println("\t" + stats.get("numFailMapQualDiff") + " failed maximum mapqual diff (ref - var) > " + maxMapQualDiff);
@@ -801,7 +946,7 @@ public class FpFilter {
     		File infile = new File(filename);
     		if(infile.exists())
     		{
-    			BufferedReader in = new BufferedReader(new FileReader(infile));
+    			BufferedReader in = new BufferedReader(new SmartFileReader(infile));
 
     			if(in.ready())
     			{

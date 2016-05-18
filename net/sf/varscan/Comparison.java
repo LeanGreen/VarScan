@@ -10,7 +10,7 @@ package net.sf.varscan;
 
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
-import java.io.FileReader;
+import net.sf.varscan.SmartFileReader;
 import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.BitSet;
@@ -18,7 +18,7 @@ import java.util.BitSet;
 /**
  * A class for comparing positions (variants) between two files
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -55,8 +55,8 @@ public class Comparison {
 
 			outFile = new PrintStream( new FileOutputStream(outFileName) );
 
-	 		BufferedReader file1 = new BufferedReader(new FileReader(fileName1));
-	 		BufferedReader file2 = new BufferedReader(new FileReader(fileName2));
+	 		BufferedReader file1 = new BufferedReader(new SmartFileReader(fileName1));
+	 		BufferedReader file2 = new BufferedReader(new SmartFileReader(fileName2));
 
 		    if(!(file1.ready() && file2.ready()))
 		    {
@@ -241,7 +241,7 @@ public class Comparison {
 
 		try
 		{
-			BufferedReader infile = new BufferedReader(new FileReader(fileName));
+			BufferedReader infile = new BufferedReader(new SmartFileReader(fileName));
 
 			String line = "";
 			int lineCounter = 0;

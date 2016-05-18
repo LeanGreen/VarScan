@@ -11,14 +11,14 @@ package net.sf.varscan;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
+import net.sf.varscan.SmartFileReader;
 import java.io.PrintStream;
 import java.util.HashMap;
 
 /**
  * A class for filtering VarScan variant predictions
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -544,7 +544,7 @@ public class FilterVariants {
     		File infile = new File(filename);
     		if(infile.exists())
     		{
-    			BufferedReader in = new BufferedReader(new FileReader(infile));
+    			BufferedReader in = new BufferedReader(new SmartFileReader(infile));
 
     			if(in.ready())
     			{

@@ -18,7 +18,7 @@ import java.text.*;
 /**
  * A set of tools for variant detection in next-generation sequence data.
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -110,7 +110,7 @@ public class VarScan {
 	 */
 	public static void main(String[] args) {
 
-		String usage = "VarScan v2.3\n\nUSAGE: java -jar VarScan.jar [COMMAND] [OPTIONS] \n\n";
+		String usage = "VarScan v2.4\n\n***NON-COMMERCIAL VERSION***\n\nUSAGE: java -jar VarScan.jar [COMMAND] [OPTIONS] \n\n";
 		usage = usage + "COMMANDS:\n" +
 				"\tpileup2snp\t\tIdentify SNPs from a pileup file\n" +
 				"\tpileup2indel\t\tIdentify indels a pileup file\n" +
@@ -496,7 +496,7 @@ public class VarScan {
 	    		{
 	    			// Parse the infile //
 	    			System.err.println("Reading input from " + args[1]);
-	    			in = new BufferedReader(new FileReader(args[1]));
+	    			in = new BufferedReader(new SmartFileReader(args[1]));
 	    		}
 	    		else
 	    		{

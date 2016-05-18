@@ -2,7 +2,7 @@ package net.sf.varscan;
 
 import java.io.BufferedReader;
 import java.io.FileOutputStream;
-import java.io.FileReader;
+import net.sf.varscan.SmartFileReader;
 import java.io.PrintStream;
 import java.util.BitSet;
 import java.util.HashMap;
@@ -10,7 +10,7 @@ import java.util.HashMap;
 /**
  * A class for processing VarScan output by somatic status and confidence
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -348,7 +348,7 @@ public class ProcessSomatic {
 
 		try
 		{
-			BufferedReader infile = new BufferedReader(new FileReader(fileName));
+			BufferedReader infile = new BufferedReader(new SmartFileReader(fileName));
 
 			String line = "";
 			int lineCounter = 0;

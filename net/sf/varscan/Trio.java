@@ -11,7 +11,7 @@ package net.sf.varscan;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileReader;
+import net.sf.varscan.SmartFileReader;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
 import java.util.*;
@@ -20,7 +20,7 @@ import java.lang.Math;
 /**
  * A class for calling variants in a mother-father-child trio
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -143,7 +143,7 @@ public class Trio {
 				// Parse sample list //
 				if(samplefile.exists())
 	    		{
-	    			BufferedReader in = new BufferedReader(new FileReader(samplefile));
+	    			BufferedReader in = new BufferedReader(new SmartFileReader(samplefile));
 	    			String line = "";
 	    			if(in.ready())
 	    			{
@@ -377,26 +377,48 @@ public class Trio {
 	    							System.err.println("Warning: More than 3 samples in pileup; but only first 3 will be used and they should be father, mother child");
 	    					}
 
-	    					// Get Father Call //
-	    					int offset = 3;
-	    					int fatherDepth = Integer.parseInt(lineContents[offset]);
-		    	        	String fatherBases = lineContents[offset + 1];
-		    	        	String fatherQualities = lineContents[offset + 2];
-		    	        	int fatherQualityDepth = VarScan.qualityDepth(fatherQualities, minAvgQual);
+	    					// Set variables to zero values //
+	    					int fatherDepth = 0;
+	    					int motherDepth = 0;
+	    					int childDepth = 0;
+	    					int fatherQualityDepth = 0;
+	    					int motherQualityDepth = 0;
+	    					int childQualityDepth = 0;
+	    					String fatherBases = null;
+	    					String motherBases = null;
+	    					String childBases = null;
+	    					String fatherQualities = null;
+	    					String motherQualities = null;
+	    					String childQualities = null;
 
-	    	        		// Get Mother Call //
-	    					offset = 6;
-	    					int motherDepth = Integer.parseInt(lineContents[offset]);
-		    	        	String motherBases = lineContents[offset + 1];
-		    	        	String motherQualities = lineContents[offset + 2];
-		    	        	int motherQualityDepth = VarScan.qualityDepth(motherQualities, minAvgQual);
+	    					try
+	    					{
+		    					// Get Father Call //
+		    					int offset = 3;
+		    					fatherDepth = Integer.parseInt(lineContents[offset]);
+			    	        	fatherBases = lineContents[offset + 1];
+			    	        	fatherQualities = lineContents[offset + 2];
+			    	        	fatherQualityDepth = VarScan.qualityDepth(fatherQualities, minAvgQual);
 
-	    	        		// Get Child Call //
-	    					offset = 9;
-	    					int childDepth = Integer.parseInt(lineContents[offset]);
-		    	        	String childBases = lineContents[offset + 1];
-		    	        	String childQualities = lineContents[offset + 2];
-		    	        	int childQualityDepth = VarScan.qualityDepth(childQualities, minAvgQual);
+		    	        		// Get Mother Call //
+		    					offset = 6;
+		    					motherDepth = Integer.parseInt(lineContents[offset]);
+			    	        	motherBases = lineContents[offset + 1];
+			    	        	motherQualities = lineContents[offset + 2];
+			    	        	motherQualityDepth = VarScan.qualityDepth(motherQualities, minAvgQual);
+
+		    	        		// Get Child Call //
+		    					offset = 9;
+		    					childDepth = Integer.parseInt(lineContents[offset]);
+			    	        	childBases = lineContents[offset + 1];
+			    	        	childQualities = lineContents[offset + 2];
+			    	        	childQualityDepth = VarScan.qualityDepth(childQualities, minAvgQual);
+	    					}
+	    					catch(Exception e)
+	    					{
+	    						// Exception thrown while parsing mpileup, which likely means one sample had no coverage //
+	    						// IN this case next if statement will fail, which is right and just //
+	    					}
 
 		    	        	if(fatherQualityDepth >= minCoverage && motherQualityDepth >= minCoverage && childQualityDepth >= minCoverage)
 	    	        		{

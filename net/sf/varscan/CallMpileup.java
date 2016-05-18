@@ -10,7 +10,7 @@ package net.sf.varscan;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import net.sf.varscan.SmartFileReader;
 import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.lang.Math;
@@ -18,7 +18,7 @@ import java.lang.Math;
 /**
  * A class for calling variants or consensus bases from a pileup file
  *
- * @version	2.3
+ * @version	2.4
  *
  * @author Daniel C. Koboldt <dkoboldt@genome.wustl.edu>
  *
@@ -121,7 +121,7 @@ public class CallMpileup {
 				// Parse sample list //
 				if(samplefile.exists())
 	    		{
-	    			BufferedReader in = new BufferedReader(new FileReader(samplefile));
+	    			BufferedReader in = new BufferedReader(new SmartFileReader(samplefile));
 	    			String line = "";
 	    			if(in.ready())
 	    			{
