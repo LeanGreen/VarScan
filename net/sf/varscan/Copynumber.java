@@ -62,6 +62,7 @@ public class Copynumber {
 		int maxSegmentSize = 100;
 		double dataRatio = 1.00;
 		double pValueThreshold = 0.01;
+		long numBases = 0;
 
 		// Try adjusting any provided parameters based on user inut //
 		try
@@ -199,6 +200,7 @@ public class Copynumber {
 
 	    		while ((line = in.readLine()) != null)
 	    		{
+	    			numBases++;
 
 	    			// Begin try-catch for line parsing //
 
@@ -208,7 +210,16 @@ public class Copynumber {
 
 	    				// Verify expected pileup format //
 
-	    				if(lineContents.length > 5 && lineContents[0].length() > 0 && lineContents[1].length() > 0 && lineContents[2].length() > 0 && lineContents[3].length() > 0)
+//	    				if(lineContents.length > 5 && lineContents[0].length() > 0 && lineContents[1].length() > 0 && lineContents[2].length() > 0 && lineContents[3].length() > 0)
+		    			if(lineContents.length < 7)
+		    			{
+							// This is an incomplete mpileup line, so skip it. If verbose, throw a warning //
+    						if(params.containsKey("verbose"))
+    						{
+    							System.err.println("Incomplete mpileup at line " + numBases + "; line being skipped.");
+    						}
+		    			}
+		    			else
 	    				{
 	    					sharedPositions++;
 
@@ -224,15 +235,25 @@ public class Copynumber {
 
 	    					// Parse normal, which should be first sample //
 	    					int normalOffset = 3;
-	    					int pileupDepthNormal = Integer.parseInt(lineContents[normalOffset]);
-		    	        	//String normalBases = lineContents[normalOffset + 1];
-		    	        	String normalQualities = lineContents[normalOffset + 2];
+	    					int pileupDepthNormal = 0;
+	    					String normalQualities = "";
+	    					if(lineContents.length >= (normalOffset + 1))
+	    					{
+		    					pileupDepthNormal = Integer.parseInt(lineContents[normalOffset]);
+			    	        	//String normalBases = lineContents[normalOffset + 1];
+			    	        	normalQualities = lineContents[normalOffset + 2];
+	    					}
 
 	    					// Parse tumor, which should be second sample //
 	    					int tumorOffset = 6;
-	    					int pileupDepthTumor = Integer.parseInt(lineContents[tumorOffset]);
-		    	        	//String tumorBases = lineContents[tumorOffset + 1];
-		    	        	String tumorQualities = lineContents[tumorOffset + 2];
+	    					int pileupDepthTumor = 0;
+	    					String tumorQualities = "";
+	    					if(lineContents.length >= (tumorOffset + 1))
+	    					{
+		    					pileupDepthTumor = Integer.parseInt(lineContents[tumorOffset]);
+			    	        	//String tumorBases = lineContents[tumorOffset + 1];
+			    	        	tumorQualities = lineContents[tumorOffset + 2];
+	    					}
 
 
 		    	        	// If either sample met the minimum coverage and both had at least one read //
@@ -372,11 +393,7 @@ public class Copynumber {
 	    					}
 
 	    				}
-	    				else
-	    				{
-	    					System.err.println("Error: Invalid format or not enough samples in mpileup: " + line + "\n");
-	    					return;
-	    				}
+
 	    			}
 	    			catch(Exception e)
 	    		    {
@@ -612,354 +629,365 @@ public class Copynumber {
 		    DecimalFormat oneDigit = new DecimalFormat("#0.0");
 		    DecimalFormat threeDigits = new DecimalFormat("#0.000");
 
+		    try {
+			    // Get first line of Normal //
 
-		    // Get first line of Normal //
+			    if((lineNormal = normal.readLine()) != null)
+			    {
+			    	String[] normalContents = lineNormal.split("\t");
 
-		    if((lineNormal = normal.readLine()) != null)
-		    {
-		    	String[] normalContents = lineNormal.split("\t");
+			    	if(normalContents.length > 1)
+			    	{
+				    	chromNormal = normalContents[0];
+				    	posNormal = Integer.parseInt(normalContents[1]);
+			    	}
+			    }
 
-		    	if(normalContents.length > 1)
+			    // Loop through lines in tumor //
+
+		    	while ((lineTumor = tumor.readLine()) != null)
 		    	{
-			    	chromNormal = normalContents[0];
-			    	posNormal = Integer.parseInt(normalContents[1]);
-		    	}
-		    }
+		    		tumorPositions++;
+		    		String[] tumorContents = lineTumor.split("\t");
 
-		    // Loop through lines in tumor //
+			    	if(tumorContents.length > 1)
+			    	{
+				    	chromTumor = tumorContents[0];
+				    	posTumor = Integer.parseInt(tumorContents[1]);
+			    	}
 
-	    	while ((lineTumor = tumor.readLine()) != null)
-	    	{
-	    		tumorPositions++;
-	    		String[] tumorContents = lineTumor.split("\t");
+			    	// Parse normal lines until we get the same chromosome //
+			    	boolean flagEOF = false;
+			    	boolean normalWasReset = false;
 
-		    	if(tumorContents.length > 1)
-		    	{
-			    	chromTumor = tumorContents[0];
-			    	posTumor = Integer.parseInt(tumorContents[1]);
-		    	}
+			    	//	Advance in normal file if tumor is changed but normal is not, or if tumor is higher //
+			    	while(!chromNormal.equals(chromTumor) && !chromTumor.equals(prevChromTumor) && !flagEOF && (chromNormal.equals(prevChromTumor) || inSortOrder(chromNormal, chromTumor)))
+			    	{
+			    		//System.err.println("Normal (" + chromNormal + ") catching up to " + chromTumor);
+			    		// Get next line from normal pileup //
+			    		if((lineNormal = normal.readLine()) != null)
+			    		{
+			    			String[] normalContents = lineNormal.split("\t");
 
-		    	// Parse normal lines until we get the same chromosome //
-		    	boolean flagEOF = false;
-		    	boolean normalWasReset = false;
-
-		    	//	Advance in normal file if tumor is changed but normal is not, or if tumor is higher //
-		    	while(!chromNormal.equals(chromTumor) && !chromTumor.equals(prevChromTumor) && !flagEOF && (chromNormal.equals(prevChromTumor) || inSortOrder(chromNormal, chromTumor)))
-		    	{
-		    		//System.err.println("Normal (" + chromNormal + ") catching up to " + chromTumor);
-		    		// Get next line from normal pileup //
-		    		if((lineNormal = normal.readLine()) != null)
-		    		{
-		    			String[] normalContents = lineNormal.split("\t");
-
-				    	if(normalContents.length > 1)
-				    	{
-					    	chromNormal = normalContents[0];
-					    	posNormal = Integer.parseInt(normalContents[1]);
-				    	}
-		    		}
-		    		else
-		    		{
-		    			flagEOF = true;
-		    		}
-
-
-		    	}
-
-		    	// If chromosomes match and are non-blank, attempt to get matching positions //
-		    	if(chromNormal.equals(chromTumor) && !chromNormal.equals(""))
-		    	{
-		    		normalWasReset = false;
-		    		// Seek to matching Normal Position //
-
-		    		while(chromNormal.equals(chromTumor) && posNormal < posTumor && ((lineNormal = normal.readLine()) != null))
-		    		{
-		    			String[] normalContents = lineNormal.split("\t");
-				    	if(normalContents.length > 1)
-				    	{
-					    	chromNormal = normalContents[0];
-					    	posNormal = Integer.parseInt(normalContents[1]);
-
-					    	// If still less than tumor position, look for homozygous del //
-					    	if(posNormal < posTumor)
+					    	if(normalContents.length > 1)
 					    	{
-					    		int pileupDepthNormal = 0;
-					    		String normalQualities = "";
-
-					    		try
-					    		{
-				    				// Pileup Files have 6-7 columns //
-			    					if(normalContents.length <= 7)
-			    					{
-			    						pileupDepthNormal = Integer.parseInt(normalContents[3]);
-			    						normalQualities = normalContents[5];
-			    					}
-			    					// Pileup lines in CNS files have 10-11 columns
-			    					else if (normalContents.length >= 10 && normalContents.length <= 11)
-			    					{
-			    						pileupDepthNormal = Integer.parseInt(normalContents[7]);
-			    						normalQualities = normalContents[9];
-			    					}
-					    		}
-					    		catch(Exception e)
-					    		{
-
-					    		}
-
+						    	chromNormal = normalContents[0];
+						    	posNormal = Integer.parseInt(normalContents[1]);
 					    	}
-					    	else
+			    		}
+			    		else
+			    		{
+			    			flagEOF = true;
+			    		}
+
+
+			    	}
+
+			    	// If chromosomes match and are non-blank, attempt to get matching positions //
+			    	if(chromNormal.equals(chromTumor) && !chromNormal.equals(""))
+			    	{
+			    		normalWasReset = false;
+			    		// Seek to matching Normal Position //
+
+			    		while(chromNormal.equals(chromTumor) && posNormal < posTumor && ((lineNormal = normal.readLine()) != null))
+			    		{
+			    			String[] normalContents = lineNormal.split("\t");
+					    	if(normalContents.length > 1)
 					    	{
+						    	chromNormal = normalContents[0];
+						    	posNormal = Integer.parseInt(normalContents[1]);
 
+						    	// If still less than tumor position, look for homozygous del //
+						    	if(posNormal < posTumor)
+						    	{
+						    		int pileupDepthNormal = 0;
+						    		String normalQualities = "";
+
+						    		try
+						    		{
+					    				// Pileup Files have 6-7 columns //
+				    					if(normalContents.length <= 7)
+				    					{
+				    						pileupDepthNormal = Integer.parseInt(normalContents[3]);
+				    						normalQualities = normalContents[5];
+				    					}
+				    					// Pileup lines in CNS files have 10-11 columns
+				    					else if (normalContents.length >= 10 && normalContents.length <= 11)
+				    					{
+				    						pileupDepthNormal = Integer.parseInt(normalContents[7]);
+				    						normalQualities = normalContents[9];
+				    					}
+						    		}
+						    		catch(Exception e)
+						    		{
+
+						    		}
+
+						    	}
+						    	else
+						    	{
+
+						    	}
 					    	}
-				    	}
-		    		}
+			    		}
 
-		    		// Seek to matching Tumor Position //
+			    		// Seek to matching Tumor Position //
 
-		    		while(chromNormal.equals(chromTumor) && posTumor < posNormal && ((lineTumor = tumor.readLine()) != null))
-		    		{
-		    			tumorContents = lineTumor.split("\t");
-				    	if(tumorContents.length > 1)
-				    	{
-					    	chromTumor = tumorContents[0];
-					    	posTumor = Integer.parseInt(tumorContents[1]);
-				    	}
-		    		}
-
-		    		// Proceed if normal and tumor positions match //
-
-		    		if(chromNormal.equals(chromTumor) && chromNormal.equals(chromTumor) && posNormal == posTumor)
-		    		{
-		    			//stats.put("sharedPositions", (stats.get("sharedPositions") + 1));
-		    			sharedPositions++;
-		    			refBase = tumorContents[2];
-
-//		    			 Parse out base qualities //
-	    				String[] normalContents = lineNormal.split("\t");
-	    				int pileupDepthNormal = 0;
-	    				int pileupDepthTumor = 0;
-	    				String normalQualities = "";
-	    				String tumorQualities = "";
-
-	    				// Pileup Files have 6-7 columns //
-    					if(normalContents.length >= 6 && normalContents.length <= 7)
-    					{
-    						pileupDepthNormal = Integer.parseInt(normalContents[3]);
-    						normalQualities = normalContents[5];
-    					}
-    					// Pileup lines in CNS files have 10-11 columns
-    					else if (normalContents.length >= 10 && normalContents.length <= 11)
-    					{
-    						pileupDepthNormal = Integer.parseInt(normalContents[7]);
-    						normalQualities = normalContents[9];
-    					}
-
-	    				// Pileup Files have 6-7 columns //
-    					if(tumorContents.length >= 6 && tumorContents.length <= 7)
-    					{
-    						tumorQualities = tumorContents[5];
-    						pileupDepthTumor = Integer.parseInt(tumorContents[3]);
-    					}
-    					// Pileup lines in CNS files have 10-11 columns
-    					else if (tumorContents.length >= 10 && tumorContents.length <= 11)
-    					{
-    						tumorQualities = tumorContents[9];
-    						pileupDepthTumor = Integer.parseInt(tumorContents[7]);
-    					}
-
-    					// If either sample met the minimum coverage and both had at least one read //
-
-//    					if((pileupDepthNormal >= minCoverage || pileupDepthTumor >= minCoverage) && normalQualities.length() > 0 && tumorQualities.length() > 0)
-
-    					// We want the normal sample to meet the minimum coverage because that's the comparator //
-    					if(pileupDepthNormal >= minCoverage && normalQualities.length() > 0) // && tumorQualities.length() > 0)
-    					{
-    						comparedPositions++;
-//    						 Get the depth of bases above minimum quality //
-
-    	    				int normalDepth = VarScan.qualityDepth(normalQualities, minBaseQual);
-    	    				int tumorDepth = VarScan.qualityDepth(tumorQualities, minBaseQual);
-
-    	    				// Determine if we have a copy changepoint //
-    	    				// If this base is not contiguous with the copyRegion
-    	    				// If the normal or tumor depth changes //
-
-    	    				int diffNormal = Math.abs(copyDepthNormal - normalDepth);
-    	    				int diffTumor = Math.abs(copyDepthTumor - tumorDepth);
-    	    				int posDiff = posTumor - copyStop;
-
-    	    				// DETERMINE IF WE CONTINUE THIS REGION OR PROCESS IT AND START A NEW ONE //
-
-    	    				boolean continueFlag = false;
-
-    	    				// If chromosomes differ or contiguity broken, process the region //
-
-    	    				if(posDiff > 2 || !(copyChrom.equals(chromTumor)))
-    	    				{
-    	    					continueFlag = false;
-    	    				}
-    	    				else
-    	    				{
-    	    					if(copyPositions >= maxSegmentSize)
-    	    					{
-    	    						continueFlag = false;
-    	    					}
-    	    					else if(diffNormal <= 2 && diffTumor <= 2)
-    	    					{
-    	    						continueFlag = true;
-    	    					}
-    	    					else
-    	    					{
-    	    						// Do a Fisher's exact test on the copy number changes. ##
-
-        	    					double changePvalue = VarScan.getSignificance(copyDepthNormal, copyDepthTumor, normalDepth, tumorDepth);
-
-        	    					// If depth change not significant, continue with region //
-        	    					if(changePvalue >= pValueThreshold)
-        	    					{
-        	    						continueFlag = true;
-        	    					}
-        	    					else
-        	    					{
-        	    						continueFlag = false;
-        	    					}
-
-    	    					}
-    	    				}
-
-
-    	    				// If continuing, extend this region and don't process yet //
-
-    	    				if(continueFlag)
-    	    				{
-    	    					copySumNormal += normalDepth;
-    	    					copySumTumor += tumorDepth;
-    	    					copyPositions++;
-    	    					if(refBase.equals("G") || refBase.equals("C") || refBase.equals("g") || refBase.equals("c"))
-    	    						copyPositionsGC++;
-    	    					copyStop = posTumor;
-    	    				}
-
-    	    				// Otherwise, process this region (if it qualifies) and start a new one //
-
-    	    				else
-    	    				{
-    	    					if(copyPositions >= minSegmentSize)
-    	    					{
-    	    						rawCopySegments++;
-    	    						String regionResults = processCopyRegion(copyChrom, copyStart, copyStop, copyPositions, copyPositionsGC, copySumNormal, copySumTumor, minCoverage, dataRatio);
-
-    	    						if(regionResults.length() > 0)
-    	    						{
-    	    							outCopySegments.println(regionResults);
-    	    							goodCopySegments++;
-    	    						}
-    	    					}
-
-    	    					// Start a new copyNumber region //
-    	    					copyChrom = chromTumor;
-    	    					copyStart = posTumor;
-    	    					copyStop = posTumor;
-    	    					copyDepthNormal = normalDepth;
-    	    					copyDepthTumor = tumorDepth;
-    	    					copySumNormal = normalDepth;
-    	    					copySumTumor = tumorDepth;
-    	    					copyPositions = 1;
-    	    					if(refBase.equals("G") || refBase.equals("C") || refBase.equals("g") || refBase.equals("c"))
-    	    						copyPositionsGC = 1;
-    	    					else
-    	    						copyPositionsGC = 0;
-    	    				}
-
-
-    					}
-    					else
-    					{
-    						// If minimum coverage was not met, print region //
-	    					// If we had a copyNumber region that met minimum coverage, report it //
-	    					if(copyPositions >= minSegmentSize)
-	    					{
-	    						rawCopySegments++;
-	    						String regionResults = processCopyRegion(copyChrom, copyStart, copyStop, copyPositions, copyPositionsGC, copySumNormal, copySumTumor, minCoverage, dataRatio);
-
-	    						if(regionResults.length() > 0)
-	    						{
-	    							outCopySegments.println(regionResults);
-	    							goodCopySegments++;
-	    						}
-	    					}
-
-	    					// Reset the copyNumber region //
-	    					copyChrom = "";
-	    					copyStart = 0;
-	    					copyStop = 0;
-	    					copyDepthNormal = 0;
-	    					copyDepthTumor = 0;
-	    					copySumNormal = 0;
-	    					copySumTumor = 0;
-	    					copyPositions = 0;
-	    					copyPositionsGC = 0;
-    					}
-
-	    				// Record this chromosome //
-
-				    	prevChromNormal = chromNormal;
-				    	prevChromTumor = chromTumor;
-		    		}
-		    		else
-		    		{
-		    			//System.err.println("Failed to match positions " + chromNormal + " " + posNormal + " to Tumor " + chromTumor + " " + posTumor);
-		    		}
-		    	}
-		    	// If they're in sort order, do nothing so that tumor can catch up //
-		    	else if(inSortOrder(chromNormal, chromTumor))
-		    	{
-		    		System.err.println("Not resetting normal file because " + chromNormal + " < " + chromTumor);
-		    	}
-		    	// If we reached the end of the normal file but never saw this chromosome, //
-		    	// fast-forward until tumor chromosome changes and reset normal file //
-		    	else if(flagEOF)
-		    	{
-		    		flagEOF = false;
-
-		    		while(prevChromTumor.equals(chromTumor) && !flagEOF)
-		    		{
-		    			if((lineTumor = tumor.readLine()) != null)
-		    			{
+			    		while(chromNormal.equals(chromTumor) && posTumor < posNormal && ((lineTumor = tumor.readLine()) != null))
+			    		{
 			    			tumorContents = lineTumor.split("\t");
-
 					    	if(tumorContents.length > 1)
 					    	{
 						    	chromTumor = tumorContents[0];
 						    	posTumor = Integer.parseInt(tumorContents[1]);
 					    	}
-		    			}
-		    			else
-		    			{
-		    				flagEOF = true;
-		    			}
-		    		}
+			    		}
 
-		    		// Reset the normal file if we've already passed this chromosome in normal //
+			    		// Proceed if normal and tumor positions match //
 
-		    		if(!flagEOF && !normalWasReset)
-		    		{
-		    			if(inSortOrder(chromNormal, chromTumor))
-		    			{
-		    				System.err.println("Not resetting normal file because " + chromNormal + " < " + chromTumor);
-		    			}
-		    			else
-		    			{
-		    				System.err.println("Resetting normal file because " + chromNormal + " > " + chromTumor);
-				    		normalWasReset = true;
-			    			normal.close();
-				    		normal = new BufferedReader(new SmartFileReader(normalPileupFile));
-		    			}
+			    		if(chromNormal.equals(chromTumor) && chromNormal.equals(chromTumor) && posNormal == posTumor)
+			    		{
+			    			//stats.put("sharedPositions", (stats.get("sharedPositions") + 1));
+			    			sharedPositions++;
+			    			refBase = tumorContents[2];
 
-		    		}
+//			    			 Parse out base qualities //
+		    				String[] normalContents = lineNormal.split("\t");
+		    				int pileupDepthNormal = 0;
+		    				int pileupDepthTumor = 0;
+		    				String normalQualities = "";
+		    				String tumorQualities = "";
+
+		    				// Pileup Files have 6-7 columns //
+	    					if(normalContents.length >= 6 && normalContents.length <= 7)
+	    					{
+	    						pileupDepthNormal = Integer.parseInt(normalContents[3]);
+	    						normalQualities = normalContents[5];
+	    					}
+	    					// Pileup lines in CNS files have 10-11 columns
+	    					else if (normalContents.length >= 10 && normalContents.length <= 11)
+	    					{
+	    						pileupDepthNormal = Integer.parseInt(normalContents[7]);
+	    						normalQualities = normalContents[9];
+	    					}
+
+		    				// Pileup Files have 6-7 columns //
+	    					if(tumorContents.length >= 6 && tumorContents.length <= 7)
+	    					{
+	    						tumorQualities = tumorContents[5];
+	    						pileupDepthTumor = Integer.parseInt(tumorContents[3]);
+	    					}
+	    					// Pileup lines in CNS files have 10-11 columns
+	    					else if (tumorContents.length >= 10 && tumorContents.length <= 11)
+	    					{
+	    						tumorQualities = tumorContents[9];
+	    						pileupDepthTumor = Integer.parseInt(tumorContents[7]);
+	    					}
+
+	    					// If either sample met the minimum coverage and both had at least one read //
+
+//	    					if((pileupDepthNormal >= minCoverage || pileupDepthTumor >= minCoverage) && normalQualities.length() > 0 && tumorQualities.length() > 0)
+
+	    					// We want the normal sample to meet the minimum coverage because that's the comparator //
+	    					if(pileupDepthNormal >= minCoverage && normalQualities.length() > 0) // && tumorQualities.length() > 0)
+	    					{
+	    						comparedPositions++;
+//	    						 Get the depth of bases above minimum quality //
+
+	    	    				int normalDepth = VarScan.qualityDepth(normalQualities, minBaseQual);
+	    	    				int tumorDepth = VarScan.qualityDepth(tumorQualities, minBaseQual);
+
+	    	    				// Determine if we have a copy changepoint //
+	    	    				// If this base is not contiguous with the copyRegion
+	    	    				// If the normal or tumor depth changes //
+
+	    	    				int diffNormal = Math.abs(copyDepthNormal - normalDepth);
+	    	    				int diffTumor = Math.abs(copyDepthTumor - tumorDepth);
+	    	    				int posDiff = posTumor - copyStop;
+
+	    	    				// DETERMINE IF WE CONTINUE THIS REGION OR PROCESS IT AND START A NEW ONE //
+
+	    	    				boolean continueFlag = false;
+
+	    	    				// If chromosomes differ or contiguity broken, process the region //
+
+	    	    				if(posDiff > 2 || !(copyChrom.equals(chromTumor)))
+	    	    				{
+	    	    					continueFlag = false;
+	    	    				}
+	    	    				else
+	    	    				{
+	    	    					if(copyPositions >= maxSegmentSize)
+	    	    					{
+	    	    						continueFlag = false;
+	    	    					}
+	    	    					else if(diffNormal <= 2 && diffTumor <= 2)
+	    	    					{
+	    	    						continueFlag = true;
+	    	    					}
+	    	    					else
+	    	    					{
+	    	    						// Do a Fisher's exact test on the copy number changes. ##
+
+	        	    					double changePvalue = VarScan.getSignificance(copyDepthNormal, copyDepthTumor, normalDepth, tumorDepth);
+
+	        	    					// If depth change not significant, continue with region //
+	        	    					if(changePvalue >= pValueThreshold)
+	        	    					{
+	        	    						continueFlag = true;
+	        	    					}
+	        	    					else
+	        	    					{
+	        	    						continueFlag = false;
+	        	    					}
+
+	    	    					}
+	    	    				}
+
+
+	    	    				// If continuing, extend this region and don't process yet //
+
+	    	    				if(continueFlag)
+	    	    				{
+	    	    					copySumNormal += normalDepth;
+	    	    					copySumTumor += tumorDepth;
+	    	    					copyPositions++;
+	    	    					if(refBase.equals("G") || refBase.equals("C") || refBase.equals("g") || refBase.equals("c"))
+	    	    						copyPositionsGC++;
+	    	    					copyStop = posTumor;
+	    	    				}
+
+	    	    				// Otherwise, process this region (if it qualifies) and start a new one //
+
+	    	    				else
+	    	    				{
+	    	    					if(copyPositions >= minSegmentSize)
+	    	    					{
+	    	    						rawCopySegments++;
+	    	    						String regionResults = processCopyRegion(copyChrom, copyStart, copyStop, copyPositions, copyPositionsGC, copySumNormal, copySumTumor, minCoverage, dataRatio);
+
+	    	    						if(regionResults.length() > 0)
+	    	    						{
+	    	    							outCopySegments.println(regionResults);
+	    	    							goodCopySegments++;
+	    	    						}
+	    	    					}
+
+	    	    					// Start a new copyNumber region //
+	    	    					copyChrom = chromTumor;
+	    	    					copyStart = posTumor;
+	    	    					copyStop = posTumor;
+	    	    					copyDepthNormal = normalDepth;
+	    	    					copyDepthTumor = tumorDepth;
+	    	    					copySumNormal = normalDepth;
+	    	    					copySumTumor = tumorDepth;
+	    	    					copyPositions = 1;
+	    	    					if(refBase.equals("G") || refBase.equals("C") || refBase.equals("g") || refBase.equals("c"))
+	    	    						copyPositionsGC = 1;
+	    	    					else
+	    	    						copyPositionsGC = 0;
+	    	    				}
+
+
+	    					}
+	    					else
+	    					{
+	    						// If minimum coverage was not met, print region //
+		    					// If we had a copyNumber region that met minimum coverage, report it //
+		    					if(copyPositions >= minSegmentSize)
+		    					{
+		    						rawCopySegments++;
+		    						String regionResults = processCopyRegion(copyChrom, copyStart, copyStop, copyPositions, copyPositionsGC, copySumNormal, copySumTumor, minCoverage, dataRatio);
+
+		    						if(regionResults.length() > 0)
+		    						{
+		    							outCopySegments.println(regionResults);
+		    							goodCopySegments++;
+		    						}
+		    					}
+
+		    					// Reset the copyNumber region //
+		    					copyChrom = "";
+		    					copyStart = 0;
+		    					copyStop = 0;
+		    					copyDepthNormal = 0;
+		    					copyDepthTumor = 0;
+		    					copySumNormal = 0;
+		    					copySumTumor = 0;
+		    					copyPositions = 0;
+		    					copyPositionsGC = 0;
+	    					}
+
+		    				// Record this chromosome //
+
+					    	prevChromNormal = chromNormal;
+					    	prevChromTumor = chromTumor;
+			    		}
+			    		else
+			    		{
+			    			//System.err.println("Failed to match positions " + chromNormal + " " + posNormal + " to Tumor " + chromTumor + " " + posTumor);
+			    		}
+			    	}
+			    	// If they're in sort order, do nothing so that tumor can catch up //
+			    	else if(inSortOrder(chromNormal, chromTumor))
+			    	{
+			    		System.err.println("Not resetting normal file because " + chromNormal + " < " + chromTumor);
+			    	}
+			    	// If we reached the end of the normal file but never saw this chromosome, //
+			    	// fast-forward until tumor chromosome changes and reset normal file //
+			    	else if(flagEOF)
+			    	{
+			    		flagEOF = false;
+
+			    		while(prevChromTumor.equals(chromTumor) && !flagEOF)
+			    		{
+			    			if((lineTumor = tumor.readLine()) != null)
+			    			{
+				    			tumorContents = lineTumor.split("\t");
+
+						    	if(tumorContents.length > 1)
+						    	{
+							    	chromTumor = tumorContents[0];
+							    	posTumor = Integer.parseInt(tumorContents[1]);
+						    	}
+			    			}
+			    			else
+			    			{
+			    				flagEOF = true;
+			    			}
+			    		}
+
+			    		// Reset the normal file if we've already passed this chromosome in normal //
+
+			    		if(!flagEOF && !normalWasReset)
+			    		{
+			    			if(inSortOrder(chromNormal, chromTumor))
+			    			{
+			    				System.err.println("Not resetting normal file because " + chromNormal + " < " + chromTumor);
+			    			}
+			    			else
+			    			{
+			    				System.err.println("Resetting normal file because " + chromNormal + " > " + chromTumor);
+					    		normalWasReset = true;
+				    			normal.close();
+					    		normal = new BufferedReader(new SmartFileReader(normalPileupFile));
+			    			}
+
+			    		}
+			    	}
+
 		    	}
 
-	    	}
+		    }
+		    catch (Exception e)
+		    {
+		    	System.err.println("Exception encountered while parsing normal/tumor files: " + e.getMessage());
+		    	System.err.println("Note: It is HIGHLY recommended that you use a two-sample mpileup input rather than separate pileup files for normal/tumor.");
+		    	return;
+		    }
+
+
+
 
 
 		    normal.close();

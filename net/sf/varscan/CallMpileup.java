@@ -782,7 +782,7 @@ public class CallMpileup {
 	    									// For the smaller deletion, determine ref bases to add //
 	    									if(varAllele.length() < maxDelSize)
 	    									{
-	    										String varEntry = maxDelBases.replace(varAllele, "");
+	    										String varEntry = maxDelBases.replaceFirst(varAllele, "");
 	    										varColumn = varColumn + refBase + varEntry;
 	    									}
 	    									else

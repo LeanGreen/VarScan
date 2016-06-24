@@ -450,24 +450,129 @@ public class Somatic {
 
 			    					int totalDepth = pileupDepthNormal + pileupDepthTumor;
 
-			    					if(allele2.startsWith("+"))
+			    					// Determine the ref and var columns and alleles //
+			    					String varBases = allele2.replace("/", ",");
+		    						String refColumn = "";
+		    						String varColumn = "";
+
+		    						int normalVarAlleleNumber = 1;
+		    						int tumorVarAlleleNumber = 1;
+		    						if(varBases.contains(","))
+		    						{
+		    							tumorVarAlleleNumber = 2;
+		    						}
+
+		    						// Handle complex positions with multiple alleles including at least one indel //
+
+		    						if(varBases.contains(",") && (varBases.contains("-") || varBases.contains("+")))
+		    						{
+		    							// Multi-allele indel //
+		    							int maxDelSize = 0;
+		    							String maxDelBases = "";
+		    							// Go through each varAllele to find longest deletion //
+		    							String[] varBaseContents = varBases.split(",");
+		    							for(String varAllele : varBaseContents)
+		    							{
+		    								// Address possible deletions//
+		    								if(varAllele.startsWith("-"))
+		    								{
+		    									varAllele = varAllele.replace("-", "");
+		    									if(varAllele.length() > maxDelSize)
+		    									{
+		    										maxDelBases = varAllele;
+		    										maxDelSize = varAllele.length();
+		    									}
+		    								}
+		    							}
+
+		    							// Set refBase to maximum del //
+		    							refColumn = refBase + maxDelBases;
+
+		    							// Establish each allele in var Column //
+		    							varColumn = "";
+
+		    							for(String varAllele : varBaseContents)
+		    							{
+	    									if(varColumn.length() > 0)
+	    										varColumn = varColumn + ",";
+
+		    								if(varAllele.startsWith("-"))
+		    								{
+		    									varAllele = varAllele.replace("-", "");
+
+		    									// For the smaller deletion, determine ref bases to add //
+		    									if(varAllele.length() < maxDelSize)
+		    									{
+		    										String varEntry = maxDelBases.replaceFirst(varAllele, "");
+		    										varColumn = varColumn + refBase + varEntry;
+		    									}
+		    									else
+		    									{
+		    										varColumn = varColumn + refBase;
+		    									}
+		    								}
+		    								else if(varAllele.startsWith("+"))
+		    								{
+		    									varAllele = varAllele.replace("+", "");
+		    									String varEntry = refBase + varAllele + maxDelBases;
+		    									varColumn = varColumn + varEntry;
+		    								}
+		    								else
+		    								{
+		    									String varEntry = varAllele + maxDelBases;
+		    									varColumn = varColumn + varEntry;
+		    								}
+		    							}
+
+
+		    						}
+
+		    						else if(varBases.startsWith("+"))
 			    					{
 			    						// INSERTION //
 			    						// Ref = ref base; Var = ref base followed by inserted bases //
-			    						String varColumn = allele1 + allele2.replace("+", "");
-			    						compareResult = "." + "\t" + allele1 + "\t" + varColumn + "\t" + ".";
+		    							refColumn = refBase;
+			    						varColumn = refBase + varBases.replace("+", "");
 			    					}
-			    					else if(allele2.startsWith("-"))
+			    					else if(varBases.startsWith("-"))
 			    					{
 			    						// DELETION //
 			    						// Ref = ref base followed by deleted bases; var = ref base //
-			    						String refColumn = allele1 + allele2.replace("-", "");
-			    						compareResult = "." + "\t" + refColumn + "\t" + allele1 + "\t" + ".";
+			    						refColumn = refBase + varBases.replace("-", "");
+			    						varColumn = refBase;
 			    					}
 			    					else
 			    					{
-				    					compareResult = "." + "\t" + allele1 + "\t" + allele2 + "\t" + ".";
+			    						refColumn = refBase;
+			    						varColumn = varBases;
 			    					}
+
+		    						// Ensure that varColumn does not contain any +/- //
+		    						varColumn = varColumn.replace("+", "");
+		    						varColumn = varColumn.replace("-", "");
+
+		    						compareResult = "." + "\t" + refColumn + "\t" + varColumn + "\t" + ".";
+
+
+
+//			    					if(allele2.startsWith("+"))
+//			    					{
+//			    						// INSERTION //
+//			    						// Ref = ref base; Var = ref base followed by inserted bases //
+//			    						String varColumn = allele1 + allele2.replace("+", "");
+//			    						compareResult = "." + "\t" + allele1 + "\t" + varColumn + "\t" + ".";
+//			    					}
+//			    					else if(allele2.startsWith("-"))
+//			    					{
+//			    						// DELETION //
+//			    						// Ref = ref base followed by deleted bases; var = ref base //
+//			    						String refColumn = allele1 + allele2.replace("-", "");
+//			    						compareResult = "." + "\t" + refColumn + "\t" + allele1 + "\t" + ".";
+//			    					}
+//			    					else
+//			    					{
+//				    					compareResult = "." + "\t" + allele1 + "\t" + allele2 + "\t" + ".";
+//			    					}
 
 
 			    					// Decide on filter field //
@@ -582,7 +687,8 @@ public class Somatic {
 					    			else
 					    				compareResult += "\tGT:GQ:DP:RD:AD:FREQ";
 
-			    					// Determine normal genotype //
+
+					    			// Determine normal genotype //
 			    					String normalGt = ".";
 			    					String tumorGt = ".";
 			    					if(normalCall.equals(refBase))
@@ -591,11 +697,11 @@ public class Somatic {
 			    					}
 			    					else if(VarScan.isHeterozygous(normalCall))
 			    					{
-			    						normalGt = "0/1";
+			    						normalGt = "0/" + normalVarAlleleNumber;
 			    					}
 			    					else
 			    					{
-			    						normalGt = "1/1";
+			    						normalGt = normalVarAlleleNumber + "/" + normalVarAlleleNumber;
 			    					}
 
 			    					if(tumorCall.equals(refBase))
@@ -604,11 +710,11 @@ public class Somatic {
 			    					}
 			    					else if(VarScan.isHeterozygous(tumorCall))
 			    					{
-			    						tumorGt = "0/1";
+			    						tumorGt = "0/" + tumorVarAlleleNumber;
 			    					}
 			    					else
 			    					{
-			    						tumorGt = "1/1";
+			    						tumorGt = tumorVarAlleleNumber + "/" + tumorVarAlleleNumber;
 			    					}
 
 			    					if(tumorDP4.length() > 0)

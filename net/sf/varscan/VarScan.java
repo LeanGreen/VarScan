@@ -110,7 +110,7 @@ public class VarScan {
 	 */
 	public static void main(String[] args) {
 
-		String usage = "VarScan v2.4\n\n***NON-COMMERCIAL VERSION***\n\nUSAGE: java -jar VarScan.jar [COMMAND] [OPTIONS] \n\n";
+		String usage = "VarScan v2.4.2\n\n***NON-COMMERCIAL VERSION***\n\nUSAGE: java -jar VarScan.jar [COMMAND] [OPTIONS] \n\n";
 		usage = usage + "COMMANDS:\n" +
 				"\tpileup2snp\t\tIdentify SNPs from a pileup file\n" +
 				"\tpileup2indel\t\tIdentify indels a pileup file\n" +

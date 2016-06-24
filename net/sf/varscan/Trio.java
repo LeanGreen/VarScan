@@ -289,7 +289,7 @@ public class Trio {
 
 	    				vcfHeader += "\n" + "##source=VarScan2";
 	    				vcfHeader += "\n" + "##INFO=<ID=ADP,Number=1,Type=Integer,Description=\"Average per-sample depth of bases with Phred score >= " + minAvgQual + "\">";
-	    				vcfHeader += "\n" + "##INFO=<ID=STATUS,Number=1,Type=String,Description=\"Variant status in trio (1=untransmitted, 2=transmitted, 3=denovo, 4=MIE)\">";
+	    				vcfHeader += "\n" + "##INFO=<ID=STATUS,Number=1,Type=String,Description=\"Variant status in trio (0=unknown, 1=untransmitted, 2=transmitted, 3=denovo, 4=MIE)\">";
 	    				vcfHeader += "\n" + "##INFO=<ID=DENOVO,Number=0,Type=Flag,Description=\"Indicates apparent de novo mutations unique to the child\">";
 	    				vcfHeader += "\n" + "##FILTER=<ID=str10,Description=\"Less than 10% or more than 90% of variant supporting reads on one strand\">";
 	    				vcfHeader += "\n" + "##FILTER=<ID=indelError,Description=\"Likely artifact due to indel reads at this position\">";
@@ -393,29 +393,46 @@ public class Trio {
 
 	    					try
 	    					{
-		    					// Get Father Call //
-		    					int offset = 3;
-		    					fatherDepth = Integer.parseInt(lineContents[offset]);
-			    	        	fatherBases = lineContents[offset + 1];
-			    	        	fatherQualities = lineContents[offset + 2];
-			    	        	fatherQualityDepth = VarScan.qualityDepth(fatherQualities, minAvgQual);
+	    						if(lineContents.length < 10)
+	    						{
+	    							// This is an incomplete mpileup line, so skip it. If verbose, throw a warning //
+		    						if(params.containsKey("verbose"))
+		    						{
+		    							System.err.println("Incomplete mpileup at line " + numBases + "; line being skipped.");
+		    						}
+	    						}
+	    						else
+	    						{
+			    					// Get Father Call //
+			    					int offset = 3;
+			    					fatherDepth = Integer.parseInt(lineContents[offset]);
+				    	        	fatherBases = lineContents[offset + 1];
+				    	        	fatherQualities = lineContents[offset + 2];
+				    	        	fatherQualityDepth = VarScan.qualityDepth(fatherQualities, minAvgQual);
 
-		    	        		// Get Mother Call //
-		    					offset = 6;
-		    					motherDepth = Integer.parseInt(lineContents[offset]);
-			    	        	motherBases = lineContents[offset + 1];
-			    	        	motherQualities = lineContents[offset + 2];
-			    	        	motherQualityDepth = VarScan.qualityDepth(motherQualities, minAvgQual);
+			    	        		// Get Mother Call //
+			    					offset = 6;
+			    					motherDepth = Integer.parseInt(lineContents[offset]);
+				    	        	motherBases = lineContents[offset + 1];
+				    	        	motherQualities = lineContents[offset + 2];
+				    	        	motherQualityDepth = VarScan.qualityDepth(motherQualities, minAvgQual);
 
-		    	        		// Get Child Call //
-		    					offset = 9;
-		    					childDepth = Integer.parseInt(lineContents[offset]);
-			    	        	childBases = lineContents[offset + 1];
-			    	        	childQualities = lineContents[offset + 2];
-			    	        	childQualityDepth = VarScan.qualityDepth(childQualities, minAvgQual);
+			    	        		// Get Child Call //
+			    					offset = 9;
+			    					childDepth = Integer.parseInt(lineContents[offset]);
+				    	        	childBases = lineContents[offset + 1];
+				    	        	childQualities = lineContents[offset + 2];
+				    	        	childQualityDepth = VarScan.qualityDepth(childQualities, minAvgQual);
+
+	    						}
+
 	    					}
 	    					catch(Exception e)
 	    					{
+	    						if(params.containsKey("verbose"))
+	    						{
+	    							System.err.println("Exception thrown while parsing mpileup at line " + numBases + ": " + e.getMessage());
+	    						}
 	    						// Exception thrown while parsing mpileup, which likely means one sample had no coverage //
 	    						// IN this case next if statement will fail, which is right and just //
 	    					}
@@ -555,8 +572,8 @@ public class Trio {
 	    	        				String childAllele = refBase;
 
 	    	        				// BUILD FATHER VCF //
-
-	    	        				String fatherVCF = "./.:.:" + fatherQualityDepth;
+	    	        				//GT:GQ:SDP:DP:RD:AD:FREQ:PVAL:RBQ:ABQ:RDF:RDR:ADF:ADR
+	    	        				String fatherVCF = "./.:.:" + fatherQualityDepth + ":.:.:.:.:.:.:.:.:.:.:.";
 
 	    	        				if(fatherContents.length >= 15)
 	    	        				{
@@ -608,7 +625,7 @@ public class Trio {
 
 		    	        				}
 		    	        				// Father is variant //
-		    	        				else if(fatherAllele.length() > 0 && !fatherAllele.equals("N") && !fatherAllele.equals("."))
+		    	        				else if(fatherAllele.length() > 0 && !fatherAllele.equals(refBase) && !fatherAllele.equals("N") && !fatherAllele.equals("."))
 		    	        				{
 		    	        					// Determine how many variant alleles have been seen //
 
@@ -652,7 +669,7 @@ public class Trio {
 
 	    	        				// BUILD MOTHER VCF //
 
-	    	        				String motherVCF = "./.:.:" + motherQualityDepth;
+	    	        				String motherVCF = "./.:.:" + motherQualityDepth + ":.:.:.:.:.:.:.:.:.:.:.";
 
 	    	        				if(motherContents.length >= 15)
 	    	        				{
@@ -704,7 +721,7 @@ public class Trio {
 
 		    	        				}
 		    	        				// mother is variant //
-		    	        				else if(motherAllele.length() > 0 && !motherAllele.equals("N") && !motherAllele.equals("."))
+		    	        				else if(motherAllele.length() > 0 && !motherAllele.equals(refBase) && !motherAllele.equals("N") && !motherAllele.equals("."))
 		    	        				{
 		    	        					// Determine how many variant alleles have been seen //
 
@@ -748,7 +765,7 @@ public class Trio {
 
 	    	        				// BUILD CHILD VCF //
 
-	    	        				String childVCF = "./.:.:" + childQualityDepth;
+	    	        				String childVCF = "./.:.:" + childQualityDepth + ":.:.:.:.:.:.:.:.:.:.:.";
 
 	    	        				if(childContents.length >= 15)
 	    	        				{
@@ -800,7 +817,7 @@ public class Trio {
 
 		    	        				}
 		    	        				// child is variant //
-		    	        				else if(childAllele.length() > 0 && !childAllele.equals("N") && !childAllele.equals("."))
+		    	        				else if(childAllele.length() > 0 && !childAllele.equals(refBase) && !childAllele.equals("N") && !childAllele.equals("."))
 		    	        				{
 		    	        					// Determine how many variant alleles have been seen //
 
@@ -1015,6 +1032,10 @@ public class Trio {
 		    						else if(trioStatus.contains("MIE"))
 		    						{
 		    							outLine += "4";
+		    						}
+		    						else
+		    						{
+		    							outLine += "0";
 		    						}
 
 		    						outLine += "\t" + "GT:GQ:SDP:DP:RD:AD:FREQ:PVAL:RBQ:ABQ:RDF:RDR:ADF:ADR" + "\t";
